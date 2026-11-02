@@ -1,0 +1,44 @@
+name: Experimental PS5 10.xx payload
+
+on:
+  push:
+    branches: [feature/experimental-fw10xx-capture]
+    paths:
+      - "payload/**"
+      - "tools/build_payload.py"
+      - ".github/workflows/fw10-experimental.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-fw10:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install LLVM and unzip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm unzip
+      - name: Download PS5 payload SDK v0.45
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 "https://github.com/ps5-payload-dev/sdk/releases/download/v0.45/ps5-payload-sdk.zip" -o "$RUNNER_TEMP/ps5sdk.zip"
+          echo "5fac64093d0e3e69f2584ce7935f24f703f622d9681f1495c85b9f00d1291a2c  $RUNNER_TEMP/ps5sdk.zip" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/ps5sdk"
+          unzip -q "$RUNNER_TEMP/ps5sdk.zip" -d "$RUNNER_TEMP/ps5sdk"
+          sdk_script="$(find "$RUNNER_TEMP/ps5sdk" -type f -path '*/ldscripts/elf_x86_64.x' -print -quit)"
+          test -n "$sdk_script"
+          sdk_root="${sdk_script%/ldscripts/elf_x86_64.x}"
+          echo "PS5_PAYLOAD_SDK=$sdk_root" >> "$GITHUB_ENV"
+      - name: Test portable 10.xx capture layout
+        run: python -m unittest discover -s tests -p test_fw10_layout.py -v
+      - name: Compile experimental ELF
+        run: python tools/build_payload.py --output build/PlayBridge-fw10-experimental.elf
+      - name: Upload experimental test ELF
+        uses: actions/upload-artifact@v4
+        with:
+          name: PlayBridge-fw10-experimental
+          path: build/PlayBridge-fw10-experimental.elf
+          if-no-files-found: error
