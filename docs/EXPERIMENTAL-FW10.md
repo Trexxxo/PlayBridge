@@ -1,0 +1,48 @@
+# Experimental PS5 10.xx capture bring-up
+
+This branch adds a **video-first, unverified PS5 10.xx path** to PlayBridge's native ELF. It is intended for initial testing on firmware **10.20**. The existing, console-tested **13.60** code path and its fixed addresses are retained.
+
+## Evidence and scope
+
+The user-supplied `PBS-Payload-0.3.0-beta.3-ps5.elf` was inspected statically:
+
+- `pbs_ps5_find_offsets` at ELF RVA `0xdaa0` selects a 10.01-family profile for 10.20 (firmware comparison masks the low build bits).
+- `pbs_ps5_offsets_1001` at `0xd3130` and `pbs_ps5_offsets_1060` at `0xd3178` both encode a `0x2b8` AVCap2 request and the same parameter field positions. The 13.60 table (`0xd3448`) instead has a `0x2e8` request.
+- PBS references `sceResourceArbitratorSetCallback`, `sceResourceArbitratorClearCallback`, `sceResourceArbitratorChangeState`, and `sceAvcap2GetNonVclNalUnitStream`. The 10.xx path resolves these by name, rather than reusing PlayBridge's 13.60 internal RVAs.
+- PBS performs capture calls through a remote-process path. **A matching request layout does not prove the same calls will work from PlayBridge's own payload process.** This is a testable hypothesis, not verified 10.xx compatibility.
+
+The 10.xx branch currently supports 1080p video **only**. Audio is intentionally disabled on this path to isolate video initialization. Higher requested resolutions fall back to 1080p. The original 13.60 path retains its previous audio, resolutions, and transport protocol. Firmware outside 10.01–10.60 and 13.60 is rejected.
+
+## Build and test on 10.20
+
+You need the existing jailbreak/homebrew runtime with an ELF loader; this code does **not** exploit or jailbreak firmware.
+
+1. Check out `feature/experimental-fw10xx-capture`.
+2. Build with the instructions in [BUILDING.md](BUILDING.md), preferably using a distinct output file:
+
+   ```powershell
+   python tools/build_payload.py --sdk C:\SDK\ps5-payload-sdk --llvm "C:\Program Files\LLVM\bin" --output build\PlayBridge-fw10.elf
+   ```
+
+3. Launch that compiled ELF manually with your normal Payload Manager/ELF loader.
+4. In PlayBridge on Windows, enable **ELF already loaded in Payload Manager** and use the **Balanced** 1080p profile. Connect to port 9076 within 60 seconds.
+5. If video fails, retrieve `/data/ps5screen-av3.txt` from the PS5 and share lines from `fw=` through `OpenVideo`, `GetHeader`, and `Start` (or the first error). These stages identify which API/ABI assumption failed.
+
+Do not upload the supplied PBS binary as part of this repository. It was used as a reference only.
+
+## Expected limitations
+
+- No real PS5 10.20 test has been run yet. The video or the module export resolution may fail.
+- PBS's remote-process capture path differs from PlayBridge's direct path. If `Initialize`, resource acquisition, or `OpenVideo` fails, porting only offsets will not be sufficient.
+- No 10.xx audio, 1440p, or 4K support is claimed.
+- Do not package or distribute a Windows release as supporting 10.xx until console validation and an ELF build have both passed.
+
+## Return codes
+
+- 9: firmware is outside the selected families.
+- 10: missing `sceAvcap2GetVideoOutMode` export.
+- 11: `ResourceArbitrator` module base unavailable.
+- 12–13: resource registration/channel setup failed.
+- 16: required ResourceArbitrator exports were not resolved.
+
+The original log messages give more detail for all other failures.
