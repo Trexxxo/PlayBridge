@@ -31,8 +31,8 @@ static void u64(unsigned char *p, int offset, uint64_t v) { memcpy(p + offset, &
 #define EXPORT __attribute__((visibility("default")))
 #endif
 EXPORT int pb_fw10(uint32_t fw) { return fw10_capture_layout(fw); }
-EXPORT uint32_t pb_make(unsigned char *p, uint32_t fps, uint32_t bitrate) {
- return fw10_prepare_video_request(p, fps, bitrate);
+EXPORT uint32_t pb_make(unsigned char *p, uint32_t fps, uint32_t bitrate, uint32_t output_mode) {
+ return fw10_prepare_video_request(p, fps, bitrate, output_mode);
 }
 EXPORT uint32_t pb_size(void) { return FW10_REQUEST_SIZE; }
 EXPORT uint32_t pb_header_size(void) { return FW10_HEADER_SIZE; }
@@ -84,7 +84,7 @@ class Firmware10LayoutTests(unittest.TestCase):
         self.assertEqual(self.lib.pb_size(), 0x2b8)
         self.assertEqual(self.lib.pb_header_size(), 0x188)
         p = (ctypes.c_ubyte * 0x2e8)()
-        rate = self.lib.pb_make(p, 60, 8000000)
+        rate = self.lib.pb_make(p, 60, 8000000, 0x138)
         data = bytes(p)
         field = lambda offset: struct.unpack_from("<I", data, offset)[0]
         qfield = lambda offset: struct.unpack_from("<Q", data, offset)[0]
@@ -94,15 +94,19 @@ class Firmware10LayoutTests(unittest.TestCase):
         self.assertEqual((qfield(0xa8), qfield(0xb0)), (0xd8, 0x20))
         self.assertEqual((field(0xb8), field(0xbc)), (8000000, 8000000))
         self.assertEqual((qfield(0x1d0), qfield(0x1d8)), (0xe8, 0x28))
-        self.assertEqual((field(0x1f0), field(0x1f4)), (1920, 1080))
+        self.assertEqual((field(0x1ec), field(0x1f0), field(0x1f4)), (384, 320, 512))
+        self.assertEqual(qfield(0x1f8), 0x3c000)
+        self.assertEqual(data[0x208:0x288], bytes([255]) * 0x80)
         self.assertEqual(qfield(0x200), 0x88)
-        self.assertEqual(field(0x288), 2)
+        self.assertEqual(field(0x288), 0x138)
+        self.assertEqual(field(0x28c), 2)
         self.assertEqual(qfield(0x290), 0x10)
         self.assertEqual((field(0x298), data[0x29c]), (1, 1))
+        self.assertEqual((qfield(0x2a0), data[0x2a8], field(0x2ac)), (0x10, 1, 110))
 
     def test_1080p_bitrate_ceiling(self):
         p = (ctypes.c_ubyte * 0x2e8)()
-        self.assertEqual(self.lib.pb_make(p, 60, 80000000), 30000000)
+        self.assertEqual(self.lib.pb_make(p, 60, 80000000, 0x138), 30000000)
         self.assertEqual(struct.unpack_from("<I", bytes(p), 0xb8)[0], 30000000)
 
 if __name__ == "__main__":
