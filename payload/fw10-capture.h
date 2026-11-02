@@ -50,9 +50,9 @@ static uint32_t fw10_prepare_video_request(unsigned char*p,uint32_t fps,uint32_t
  u64(p,0x200,0x88);
  memset(p+0x210,0xff,0x80);
  u32(p,0x288,2);
- u64(p,0x28c,0x10);
- u32(p,0x294,1);
- p[0x298]=1;
+ u64(p,0x290,0x10);
+ u32(p,0x298,1);
+ p[0x29c]=1;
  return rate;
 }
 #endif
