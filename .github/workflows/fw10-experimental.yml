@@ -5,6 +5,7 @@ on:
     branches: [feature/experimental-fw10xx-capture]
     paths:
       - "payload/**"
+      - "tests/test_fw10_layout.py"
       - "tools/build_payload.py"
       - ".github/workflows/fw10-experimental.yml"
   workflow_dispatch:
