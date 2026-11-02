@@ -11,7 +11,7 @@ The user-supplied `PBS-Payload-0.3.0-beta.3-ps5.elf` was inspected statically:
 - PBS references `sceResourceArbitratorSetCallback`, `sceResourceArbitratorClearCallback`, `sceResourceArbitratorChangeState`, and `sceAvcap2GetNonVclNalUnitStream`. The 10.xx path resolves these by name, rather than reusing PlayBridge's 13.60 internal RVAs.
 - PBS performs capture calls through a remote-process path. **A matching request layout does not prove the same calls will work from PlayBridge's own payload process.** This is a testable hypothesis, not verified 10.xx compatibility.
 
-The 10.xx branch currently supports 1080p video **only**. Audio is intentionally disabled on this path to isolate video initialization. Higher requested resolutions fall back to 1080p. The original 13.60 path retains its previous audio, resolutions, and transport protocol. Firmware outside 10.01–10.60 and 13.60 is rejected.
+The 10.xx branch currently supports 1080p video, confirmed by a 10.20 console test. AAC audio is now **experimental**: it attempts the existing AVCap2 audio path, but preserves video streaming if audio initialization fails. Higher requested resolutions fall back to 1080p. The original 13.60 path retains its previous audio, resolutions, and transport protocol. Firmware outside 10.01–10.60 and 13.60 is rejected.
 
 ## Build and test on 10.20
 
@@ -32,9 +32,9 @@ Do not upload the supplied PBS binary as part of this repository. It was used as
 
 ## Expected limitations
 
-- No real PS5 10.20 test has been run yet. The video or the module export resolution may fail.
+- A 10.20 console test confirmed video capture works with the revised request. AAC audio has not yet been verified on 10.20.
 - PBS's remote-process capture path differs from PlayBridge's direct path. If `Initialize`, resource acquisition, or `OpenVideo` fails, porting only offsets will not be sufficient.
-- No 10.xx audio, 1440p, or 4K support is claimed.
+- 10.xx AAC audio is experimental and may be unavailable; no 1440p or 4K support is claimed.
 - Do not package or distribute a Windows release as supporting 10.xx until console validation and an ELF build have both passed.
 
 ## Return codes
