@@ -104,6 +104,34 @@ class Firmware10LayoutTests(unittest.TestCase):
         self.assertEqual((field(0x298), data[0x29c]), (1, 1))
         self.assertEqual((qfield(0x2a0), data[0x2a8], field(0x2ac)), (0x10, 1, 110))
 
+    def test_gls_probe_only_changes_resource_profile(self):
+        # The probe must retain the already-working firmware 10.20 request layout.
+        source = Path(self.temp.name) / "fw10-test.c"
+        out = Path(self.temp.name) / ("fw10-probe.dll" if os.name == "nt" else "fw10-probe.so")
+        if os.name == "nt":
+            flags = ["--target=x86_64-pc-windows-msvc", "-O1", "-fno-builtin",
+                     "-nostdlib", "-shared", "-fuse-ld=lld", "-Wl,/noentry"]
+        else:
+            flags = ["-std=c11", "-O1", "-fno-builtin", "-shared", "-fPIC"]
+        subprocess.run([compiler(), *flags, "-DPLAYBRIDGE_GLS_RESOURCE_PROBE=1",
+                        "-Wall", "-Wextra", "-Werror", "-I", str(ROOT / "payload"),
+                        str(source), "-o", str(out)],
+                       check=True, capture_output=True, text=True)
+        probe = ctypes.WinDLL(str(out)) if os.name == "nt" else ctypes.CDLL(str(out))
+        probe.pb_make.restype = ctypes.c_uint32
+        default_bytes = (ctypes.c_ubyte * 0x2e8)()
+        probe_bytes = (ctypes.c_ubyte * 0x2e8)()
+        self.lib.pb_make(default_bytes, 60, 8000000, 0x138)
+        probe.pb_make(probe_bytes, 60, 8000000, 0x138)
+        default_data = bytes(default_bytes)
+        probe_data = bytes(probe_bytes)
+        self.assertEqual(struct.unpack_from("<I", default_data, 0x28)[0], 12)
+        self.assertEqual(struct.unpack_from("<I", probe_data, 0x28)[0], 200)
+        self.assertEqual(default_data[:0x28], probe_data[:0x28])
+        self.assertEqual(default_data[0x2c:], probe_data[0x2c:])
+        if os.name == "nt":
+            ctypes.windll.kernel32.FreeLibrary(probe._handle)
+
     def test_1080p_bitrate_ceiling(self):
         p = (ctypes.c_ubyte * 0x2e8)()
         self.assertEqual(self.lib.pb_make(p, 60, 80000000, 0x138), 30000000)

@@ -43,3 +43,11 @@ jobs:
           name: PlayBridge-fw10-experimental
           path: build/PlayBridge-fw10-experimental.elf
           if-no-files-found: error
+      - name: Compile opt-in native GLS resource probe
+        run: python tools/build_payload.py --gls-resource-probe --output build/PlayBridge-fw1020-gls-resource-probe.elf
+      - name: Upload GLS resource probe ELF
+        uses: actions/upload-artifact@v4
+        with:
+          name: PlayBridge-fw1020-gls-resource-probe
+          path: build/PlayBridge-fw1020-gls-resource-probe.elf
+          if-no-files-found: error

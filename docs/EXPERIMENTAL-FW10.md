@@ -30,6 +30,25 @@ You need the existing jailbreak/homebrew runtime with an ELF loader; this code d
 
 Do not upload the supplied PBS binary as part of this repository. It was used as a reference only.
 
+## Optional 10.20 native GameLiveStreaming resource probe
+
+The decrypted `NPXS40142` GameLiveStreamingDaemon uses ResourceArbitrator resource ID **200** for `RUNNING`, `STOP`, and `RUNNING_AUDIO_ONLY` transitions. PlayBridge's working 10.20 AVCap2 request uses **12**. **ID 200 is not established as a game-only video source:** it might be only the native broadcast service's own lifecycle resource. Trying it could fail or interfere with active broadcast.
+
+To test this hypothesis without changing the known-working build, the GitHub Actions workflow produces **two separate** ELFs:
+
+1. **`PlayBridge-fw10-experimental.elf`**: unchanged, working 10.20 capture (resource 12). Recommended for normal streaming.
+2. **`PlayBridge-fw1020-gls-resource-probe.elf`**: *opt-in*, unverified 10.20-only experiment (resource 200 in both the AVCap2 request and ResourceArbitrator state change).
+
+To build the probe yourself:
+
+```powershell
+python tools/build_payload.py --gls-resource-probe --sdk C:\\SDK\\ps5-payload-sdk --llvm "C:\\Program Files\\LLVM\\bin" --output build\\PlayBridge-fw1020-gls-resource-probe.elf
+```
+
+Test with the regular PlayBridge Windows viewer. Do **not** run a native Twitch broadcast concurrently. With a game running, trigger an ordinary notification and compare the local TV against the PlayBridge image. Record whether `Resource register`, `Resource request`, `OpenVideo`, and `Start` succeed in `/data/ps5screen-av3.txt`. If the probe fails to open video, switch back to the default artifact. Do not interpret a successful `OpenVideo` as proof that notifications are filtered; the visual A/B test is essential.
+
+This experiment does not suppress PS5 notifications locally or implement privacy filtering. The 13.60 code path is untouched.
+
 ## Expected limitations
 
 - A 10.20 console test confirmed video capture works with the revised request. AAC audio has not yet been verified on 10.20.

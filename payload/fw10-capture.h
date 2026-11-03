@@ -12,7 +12,13 @@
 
 #define FW10_REQUEST_SIZE 0x2b8u
 #define FW10_HEADER_SIZE  0x188u
+/* ResourceArbitrator 200 was observed in the native GameLiveStreamingDaemon.
+ * Its role in game-only capture is UNPROVEN. Default must stay 12. */
+#ifdef PLAYBRIDGE_GLS_RESOURCE_PROBE
+#define FW10_RESOURCE_PROFILE 200
+#else
 #define FW10_RESOURCE_PROFILE 12
+#endif
 #define FW10_FRAME_BUDGET 0x100000u
 
 static int fw10_capture_layout(uint32_t fw){
