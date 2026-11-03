@@ -51,3 +51,35 @@ This confirms a native video privacy configuration path is present, **not what i
 - **Present in saved clip but absent from native Twitch stream**: filtering may be specific to the GameLiveStreaming daemon or broadcast setup.
 
 This test does not require modifying the payload. If further inspection is required, compare the actual native OpenVideo request using authorized userland debugging before changing any opaque request bytes. Keep firmware 13.60 and the working 10.20 capture path untouched.
+
+## Follow-up: live hardware results and native GLS request initializer
+
+On FW 10.20, the isolated `VideoNormal` selector (`request[0x10]=1`) returned
+`OpenVideo=0`, `GetHeader=0`, `Start=0`, and audio packets, but **zero video
+frames in 27 seconds**. Starting a native Create recording, taking screenshots,
+and saving recent gameplay while the probe was running did not produce frames.
+`VideoNormal` is not a viable drop-in source. Revert to the working ScanIn ELF.
+
+**Native GameLiveStreamingDaemon `NPXS40142` static code evidence:** the
+request initializer at ELF file offset `0x473a0` zeroes 0x2a8 bytes after the
+header, sets size `0x2b8`, capture role `+0x14=1`, and ResourceArbitrator ID
+`+0x28=200`; PlayBridge's working FW10 profile uses role 2 and RA12.
+The helper at file offset `0x47450` switches device selector `+0x10` to
+`2` for one conditional path in native setup `0x4344f`; otherwise it uses
+`0` (ScanIn) at `0x43499`. The same helper then configures the type-specific
+trailing request fields. The setup path at `0x43af0` passes the request into
+the video-open routine. This is a **stronger native pattern** than the earlier
+VideoNormal hypothesis, but it does not yet prove which field excludes overlays.
+
+Two new opt-in, non-default builds keep the working `VideoScanIn` device
+and encoder settings unchanged:
+
+- `--gls-role-probe`: changes only `request[0x14]` from 2 to 1; RA12 remains.
+- `--gls-native-role-probe`: changes `request[0x14]` 2 to 1 and RA ID 12 to
+  200, matching those two directly observed native fields.
+
+These are **minimal differential probes**, not full replicas of native request
+data (other native initializer fields differ). All earlier ELF variants and the
+FW13.60 request remain unchanged. Both test builds record the first empty
+`sceAvcap2ReadVideo` status once, to distinguish an idle source from encoder
+errors. Notification-free capture must still be verified on actual hardware.

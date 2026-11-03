@@ -11,8 +11,10 @@ def main():
  ap.add_argument('--gls-resource-probe',action='store_true',help='Opt-in 10.20 GameLiveStreaming resource ID 200 experiment (unverified)')
  ap.add_argument('--scanin-source-probe',action='store_true',help='Opt-in 10.20 ScanIn encoder mode experiment (unverified)')
  ap.add_argument('--video-normal-probe',action='store_true',help='Opt-in 10.20 VideoNormal capture-device selector experiment (unverified)')
+ ap.add_argument('--gls-role-probe',action='store_true',help='Opt-in 10.20 native GameLiveStreaming capture role 1, RA 12')
+ ap.add_argument('--gls-native-role-probe',action='store_true',help='Opt-in 10.20 native GameLiveStreaming capture role 1 with RA 200')
  args=ap.parse_args()
- if sum((args.gls_resource_probe,args.scanin_source_probe,args.video_normal_probe))>1:ap.error('Run only one capture probe at a time')
+ if sum((args.gls_resource_probe,args.scanin_source_probe,args.video_normal_probe,args.gls_role_probe,args.gls_native_role_probe))>1:ap.error('Run only one capture probe at a time')
  if not args.sdk:ap.error('Set --sdk or PS5_PAYLOAD_SDK to your installed PS5 payload SDK.')
  sdk=Path(args.sdk).resolve();out=args.output.resolve();out.parent.mkdir(parents=True,exist_ok=True)
  work=root/'build/payload';work.mkdir(parents=True,exist_ok=True);obj=work/'stream-av3.o'
@@ -26,6 +28,8 @@ def main():
  defines=['-DPLAYBRIDGE_GLS_RESOURCE_PROBE=1'] if args.gls_resource_probe else []
  if args.scanin_source_probe:defines.append('-DPLAYBRIDGE_SCANIN_SOURCE_PROBE=1')
  if args.video_normal_probe:defines.append('-DPLAYBRIDGE_VIDEO_NORMAL_PROBE=1')
+ if args.gls_role_probe:defines.append('-DPLAYBRIDGE_GLS_ROLE_PROBE=1')
+ if args.gls_native_role_probe:defines.append('-DPLAYBRIDGE_GLS_NATIVE_ROLE_PROBE=1')
  subprocess.run([tool('clang'),'-target','x86_64-sie-ps5','-std=c11','-O2','-fno-stack-protector','-fno-plt','-femulated-tls','-Wall','-Wextra','-Werror',*defines,'-isystem',str(sdk/'target/include'),'-c',str(root/'payload/stream-av3.c'),'-o',str(obj)],check=True)
  subprocess.run([tool('ld.lld'),'-m','elf_x86_64','-pie','--eh-frame-hdr','-z','max-page-size=0x4000','-L',str(sdk/'target/lib'),'-T',str(sdk/'ldscripts/elf_x86_64.x'),'-o',str(out),'-lc',str(sdk/'target/lib/crt1.o'),str(obj),'-lkernel_web','-lSceLibcInternal','-lSceNet','--hash-style=gnu'],check=True)
  subprocess.run([tool('llvm-readobj'),'--file-headers',str(out)],check=True)

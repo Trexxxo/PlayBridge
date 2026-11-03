@@ -14,12 +14,20 @@
 #define FW10_HEADER_SIZE  0x188u
 /* ResourceArbitrator 200 was observed in the native GameLiveStreamingDaemon.
  * Its role in game-only capture is UNPROVEN. Default must stay 12. */
-#ifdef PLAYBRIDGE_GLS_RESOURCE_PROBE
+#if defined(PLAYBRIDGE_GLS_RESOURCE_PROBE) || defined(PLAYBRIDGE_GLS_NATIVE_ROLE_PROBE)
 #define FW10_RESOURCE_PROFILE 200
 #else
 #define FW10_RESOURCE_PROFILE 12
 #endif
 #define FW10_FRAME_BUDGET 0x100000u
+/* Native GameLiveStreamingDaemon request constructor (NPXS40142 file
+ * offset 0x473c8) sets capture role +0x14 to 1. The tested 10.20
+ * PlayBridge request uses 2. Probe role alone and role+native RA200. */
+#if defined(PLAYBRIDGE_GLS_ROLE_PROBE) || defined(PLAYBRIDGE_GLS_NATIVE_ROLE_PROBE)
+#define FW10_CAPTURE_ROLE 1u
+#else
+#define FW10_CAPTURE_ROLE 2u
+#endif
 /* AvCaptureManager 10.20 device factory (ELF file offset 0x17ab0):
  * 0=VideoScanIn, 1=VideoNormal, 2=VideoSecond (identified via vtables).
  * Keep zero unless building the explicitly opt-in VideoNormal probe. */
@@ -43,7 +51,7 @@ static uint32_t fw10_prepare_video_request(unsigned char*p,uint32_t fps,uint32_t
  u64(p,0,FW10_REQUEST_SIZE);
  u64(p,8,0x28);
  u32(p,0x10,FW10_VIDEO_DEVICE_TYPE);
- u32(p,0x14,2);
+ u32(p,0x14,FW10_CAPTURE_ROLE);
  u32(p,0x18,4);
  u32(p,0x1c,1);
  u32(p,0x24,0);

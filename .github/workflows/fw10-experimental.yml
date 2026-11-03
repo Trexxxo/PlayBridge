@@ -67,3 +67,19 @@ jobs:
           name: PlayBridge-fw1020-video-normal-probe
           path: build/PlayBridge-fw1020-video-normal-probe.elf
           if-no-files-found: error
+      - name: Compile 10.20 native GLS capture role probe
+        run: python tools/build_payload.py --gls-role-probe --output build/PlayBridge-fw1020-gls-role-probe.elf
+      - name: Upload native GLS capture role probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: PlayBridge-fw1020-gls-role-probe
+          path: build/PlayBridge-fw1020-gls-role-probe.elf
+          if-no-files-found: error
+      - name: Compile 10.20 native GLS role and resource probe
+        run: python tools/build_payload.py --gls-native-role-probe --output build/PlayBridge-fw1020-gls-native-role-probe.elf
+      - name: Upload native GLS role and resource probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: PlayBridge-fw1020-gls-native-role-probe
+          path: build/PlayBridge-fw1020-gls-native-role-probe.elf
+          if-no-files-found: error

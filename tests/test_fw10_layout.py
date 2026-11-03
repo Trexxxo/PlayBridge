@@ -158,6 +158,39 @@ class Firmware10LayoutTests(unittest.TestCase):
         if os.name == "nt":
             ctypes.windll.kernel32.FreeLibrary(normal._handle)
 
+
+    def test_native_gls_role_probes_change_only_verified_fields(self):
+        source = Path(self.temp.name) / "fw10-test.c"
+        baseline = (ctypes.c_ubyte * 0x2e8)()
+        self.lib.pb_make(baseline, 60, 8000000, 0x138)
+        for name, define, resource, differences in (
+            ("gls-role", "PLAYBRIDGE_GLS_ROLE_PROBE", 12, {0x14}),
+            ("gls-native-role", "PLAYBRIDGE_GLS_NATIVE_ROLE_PROBE", 200, {0x14, 0x28}),
+        ):
+            with self.subTest(name=name):
+                out = Path(self.temp.name) / (name + (".dll" if os.name == "nt" else ".so"))
+                if os.name == "nt":
+                    flags = ["--target=x86_64-pc-windows-msvc", "-O1", "-fno-builtin",
+                             "-nostdlib", "-shared", "-fuse-ld=lld", "-Wl,/noentry"]
+                else:
+                    flags = ["-std=c11", "-O1", "-fno-builtin", "-shared", "-fPIC"]
+                subprocess.run([compiler(), *flags, "-D" + define + "=1",
+                                "-Wall", "-Wextra", "-Werror", "-I", str(ROOT / "payload"),
+                                str(source), "-o", str(out)],
+                               check=True, capture_output=True, text=True)
+                probe = ctypes.WinDLL(str(out)) if os.name == "nt" else ctypes.CDLL(str(out))
+                probe.pb_make.restype = ctypes.c_uint32
+                candidate = (ctypes.c_ubyte * 0x2e8)()
+                probe.pb_make(candidate, 60, 8000000, 0x138)
+                data = bytes(candidate)
+                self.assertEqual(struct.unpack_from("<I", data, 0x10)[0], 0)
+                self.assertEqual(struct.unpack_from("<I", data, 0x14)[0], 1)
+                self.assertEqual(struct.unpack_from("<I", data, 0x28)[0], resource)
+                changed = {i for i, (a, b) in enumerate(zip(bytes(baseline), data)) if a != b}
+                self.assertEqual(changed, differences)
+                if os.name == "nt":
+                    ctypes.windll.kernel32.FreeLibrary(probe._handle)
+
     def test_1080p_bitrate_ceiling(self):
         p = (ctypes.c_ubyte * 0x2e8)()
         self.assertEqual(self.lib.pb_make(p, 60, 80000000, 0x138), 30000000)
