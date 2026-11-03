@@ -33,7 +33,9 @@ Neither resource 200 nor enabling ScanIn encode is sufficient. Retain the tested
 | `0x1a9a0` | `SceAvCaptureDeviceVideoNormal` |
 | `0x1b270` | `SceAvCaptureDeviceVideoSecond` |
 
-These are separate internal device implementations, not proven user-accessible mode choices. Code around `0x17ce9` handles a 0x2b8-byte request object; validation near `0x17be0` and dispatch near `0x17d80` are the next reverse-engineering targets. The `4` in the PlayBridge client request is identified as a profile/FPS selector by the available AVCap2 client layout, not an established source selector.
+**Factory trace:** At ELF file offset `0x17ab0`, the manager switches on the 32-bit request field at `+0x10` and chooses one of three device constructors. At `0x17b22` (value 0) it constructs the ScanIn device (`0x18920`, vtable `0x29378`); at `0x17b5e` (value 1) it constructs VideoNormal (`0x1a5e0`, vtable `0x294e0`); at `0x17b9a` (value 2) it constructs VideoSecond (`0x1a9b0`, vtable `0x29628`). These vtable-to-name mappings were checked against ELF RELA entries for the name-return methods above. The `0x2b8` request constructor at `0x17cd0` and IPC caller around `0x4c83`/`0x4d9a` connect the factory to AVCap2 request handling. PlayBridge's 10.20 request leaves `+0x10` zero, so **VideoScanIn is the default candidate**.
+
+**New opt-in hypothesis:** A build using `--video-normal-probe` sets only the 32-bit `+0x10` request field to `1`, preserving resource 12 and every other field. This should exercise VideoNormal rather than VideoScanIn if the request object maps directly to the factory input as traced. Native PS5 saved clips were observed to exclude notifications while they remain visible on TV; however, that fact does **not** yet prove native recording uses VideoNormal. This is a test, not a guaranteed fix. Check `VideoNormal probe`, `OpenVideo`, `Start`, and the actual stream image. If it fails, return to the baseline ELF. The `4` field remains a profile/FPS selector and is not changed.
 
 ## Privacy encoder configuration
 
@@ -43,7 +45,7 @@ This confirms a native video privacy configuration path is present, **not what i
 
 ## Next differentiating test
 
-Record a short video with the PS5 built-in Create > Start New Recording feature while a notification is visibly shown on the TV. Check whether that notification appears in the **saved native clip**:
+**Observed hardware result (user, twice):** A notification visible on the TV did **not** appear in a clip saved using PS5 Create > Start New Recording. This confirms a game-only/native recording behavior worth matching. Next test the isolated VideoNormal selector probe; no other firmware, mode, or ResourceArbitrator field is changed.
 
 - **Absent from saved clip**: the shared AvCaptureManager game-recording pipeline likely excludes at least this overlay; tracing its device selection becomes higher priority.
 - **Present in saved clip but absent from native Twitch stream**: filtering may be specific to the GameLiveStreaming daemon or broadcast setup.

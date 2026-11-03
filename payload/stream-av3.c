@@ -63,6 +63,9 @@ if(fw10_capture_layout(fw)){if((fw&0xffff0000u)!=0x10200000u){LOG("GLS resource 
 #ifdef PLAYBRIDGE_SCANIN_SOURCE_PROBE
 if(fw10_capture_layout(fw)){if((fw&0xffff0000u)!=0x10200000u){LOG("ScanIn source probe limited to 10.20; refusing other 10.xx firmware\n");fclose(logf);return 9;}LOG("SCANIN SOURCE PROBE enabled: AVCap2 EnableScanInEncode is unverified for game-only capture\n");}
 #endif
+#ifdef PLAYBRIDGE_VIDEO_NORMAL_PROBE
+if(fw10_capture_layout(fw)){if((fw&0xffff0000u)!=0x10200000u){LOG("VideoNormal probe limited to 10.20; refusing other 10.xx firmware\n");fclose(logf);return 9;}LOG("VIDEO NORMAL PROBE enabled: AvCaptureManager selector hypothesis, NOT proven notification filtering\n");}
+#endif
 LOG("Listening TCP 9076 for 60 seconds...\n");client=wait_client();if(client<0){LOG("No viewer or socket error errno=%d\n",errno);fclose(logf);return 14;}LOG("Viewer connected\n");if(receive_options()<0){LOG("Invalid capture options\n");close(client);fclose(logf);return 15;}LOG("Capture request fps=%u bitrate=%u resolution=%u\n",capture_fps,capture_bitrate,requested_resolution);uint32_t kh=0;const char*ks[]={"libkernel_web.sprx","libkernel.sprx","libkernel_sys.sprx",0};for(int i=0;ks[i];i++)if(!kernel_dynlib_handle(-1,ks[i],&kh)&&kh)break;load_fn load=kh?(load_fn)kernel_dynlib_resolve(-1,kh,"wzvqT4UqKX8"):0;module(load,"libSceIpmi.sprx");uint32_t ah=module(load,"libSceAvcap2.sprx");if(!ah){fclose(logf);return 2;}
 int(*Init)(void)=(void*)kernel_dynlib_dlsym(-1,ah,"sceAvcap2Initialize");int(*Term)(void)=(void*)kernel_dynlib_dlsym(-1,ah,"sceAvcap2Terminate");int(*Open)(int64_t*,void*,int)=(void*)kernel_dynlib_dlsym(-1,ah,"sceAvcap2OpenVideo");int(*Start)(int64_t)=(void*)kernel_dynlib_dlsym(-1,ah,"sceAvcap2Start");int(*Stop)(int64_t)=(void*)kernel_dynlib_dlsym(-1,ah,"sceAvcap2Stop");int(*Close)(int64_t)=(void*)kernel_dynlib_dlsym(-1,ah,"sceAvcap2Close");int(*Read)(int64_t,void*,size_t,void*,int)=(void*)kernel_dynlib_dlsym(-1,ah,"sceAvcap2ReadVideo");if(!Init||!Term||!Open||!Start||!Stop||!Close||!Read){LOG("missing API\n");fclose(logf);return 3;}
 int(*OpenAudio)(int64_t*,void*,int)=(void*)kernel_dynlib_dlsym(-1,ah,"sceAvcap2OpenAudio");int(*ReadAudio)(int64_t,void*,size_t,void*,int)=(void*)kernel_dynlib_dlsym(-1,ah,"sceAvcap2ReadAudio");
@@ -73,6 +76,9 @@ LOG("Initialize...\n");int rv=Init();LOG("Initialize=%08x\n",rv);if(rv<0){fclose
  LOG("EXPERIMENTAL 10.xx profile fw=%08x request=%x video=1080p bitrate=%u; attempting AAC audio; video remains available without it\n",fw,FW10_REQUEST_SIZE,capture_bitrate);
 #ifdef PLAYBRIDGE_GLS_RESOURCE_PROBE
  LOG("GLS resource probe: RA id=%d OpenVideo request[0x28]=%d; compare notifications on TV vs stream\n",resource_profile,FW10_RESOURCE_PROFILE);
+#endif
+#ifdef PLAYBRIDGE_VIDEO_NORMAL_PROBE
+ LOG("VideoNormal probe: request[0x10]=%u (0=ScanIn,1=Normal,2=Second), RA id=%d\n",FW10_VIDEO_DEVICE_TYPE,resource_profile);
 #endif
 }
 /* Firmware-specific entries corroborated against offline Resource2 Ghidra project.

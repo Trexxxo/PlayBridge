@@ -20,6 +20,14 @@
 #define FW10_RESOURCE_PROFILE 12
 #endif
 #define FW10_FRAME_BUDGET 0x100000u
+/* AvCaptureManager 10.20 device factory (ELF file offset 0x17ab0):
+ * 0=VideoScanIn, 1=VideoNormal, 2=VideoSecond (identified via vtables).
+ * Keep zero unless building the explicitly opt-in VideoNormal probe. */
+#ifdef PLAYBRIDGE_VIDEO_NORMAL_PROBE
+#define FW10_VIDEO_DEVICE_TYPE 1u
+#else
+#define FW10_VIDEO_DEVICE_TYPE 0u
+#endif
 
 static int fw10_capture_layout(uint32_t fw){
  uint32_t family=fw&0xffff0000u;
@@ -34,6 +42,7 @@ static uint32_t fw10_prepare_video_request(unsigned char*p,uint32_t fps,uint32_t
  memset(p,0,0x2e8);
  u64(p,0,FW10_REQUEST_SIZE);
  u64(p,8,0x28);
+ u32(p,0x10,FW10_VIDEO_DEVICE_TYPE);
  u32(p,0x14,2);
  u32(p,0x18,4);
  u32(p,0x1c,1);

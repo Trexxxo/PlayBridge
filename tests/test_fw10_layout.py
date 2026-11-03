@@ -132,6 +132,32 @@ class Firmware10LayoutTests(unittest.TestCase):
         if os.name == "nt":
             ctypes.windll.kernel32.FreeLibrary(probe._handle)
 
+    def test_video_normal_probe_changes_only_device_selector(self):
+        source = Path(self.temp.name) / "fw10-test.c"
+        out = Path(self.temp.name) / ("fw10-normal.dll" if os.name == "nt" else "fw10-normal.so")
+        if os.name == "nt":
+            flags = ["--target=x86_64-pc-windows-msvc", "-O1", "-fno-builtin",
+                     "-nostdlib", "-shared", "-fuse-ld=lld", "-Wl,/noentry"]
+        else:
+            flags = ["-std=c11", "-O1", "-fno-builtin", "-shared", "-fPIC"]
+        subprocess.run([compiler(), *flags, "-DPLAYBRIDGE_VIDEO_NORMAL_PROBE=1",
+                        "-Wall", "-Wextra", "-Werror", "-I", str(ROOT / "payload"),
+                        str(source), "-o", str(out)],
+                       check=True, capture_output=True, text=True)
+        normal = ctypes.WinDLL(str(out)) if os.name == "nt" else ctypes.CDLL(str(out))
+        normal.pb_make.restype = ctypes.c_uint32
+        baseline = (ctypes.c_ubyte * 0x2e8)()
+        candidate = (ctypes.c_ubyte * 0x2e8)()
+        self.lib.pb_make(baseline, 60, 8000000, 0x138)
+        normal.pb_make(candidate, 60, 8000000, 0x138)
+        base_bytes, candidate_bytes = bytes(baseline), bytes(candidate)
+        self.assertEqual(struct.unpack_from("<I", base_bytes, 0x10)[0], 0)
+        self.assertEqual(struct.unpack_from("<I", candidate_bytes, 0x10)[0], 1)
+        self.assertEqual(base_bytes[:0x10], candidate_bytes[:0x10])
+        self.assertEqual(base_bytes[0x14:], candidate_bytes[0x14:])
+        if os.name == "nt":
+            ctypes.windll.kernel32.FreeLibrary(normal._handle)
+
     def test_1080p_bitrate_ceiling(self):
         p = (ctypes.c_ubyte * 0x2e8)()
         self.assertEqual(self.lib.pb_make(p, 60, 80000000, 0x138), 30000000)
