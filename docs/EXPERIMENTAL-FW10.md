@@ -49,6 +49,26 @@ Test with the regular PlayBridge Windows viewer. Do **not** run a native Twitch 
 
 This experiment does not suppress PS5 notifications locally or implement privacy filtering. The 13.60 code path is untouched.
 
+## Native game-only source research (10.20)
+
+Static tracing of the decrypted `NPXS40100` AvCaptureManager reveals three distinct video-device implementations:
+
+- `SceAvCaptureDeviceVideoScanIn` (name-return routine at ELF file offset `0x19950`)
+- `SceAvCaptureDeviceVideoNormal` (routine at `0x1a9a0`)
+- `SceAvCaptureDeviceVideoSecond` (routine at `0x1b270`)
+
+AvCaptureManager also invokes `sceVencSetNormalPrivacyProtectionConfig` in multiple device paths (for example around file offsets `0x18dc8`, `0x1ac58`, and `0x1b1fb`), passing a 24-byte block derived from the active device state. **These findings do not establish which source or privacy flag hides notifications.** The tested GLS resource ID 200 produced normal video *with* notifications, so resource 200 alone is ruled out as a filter.
+
+The external [Glint AVCap2 capture notes](https://github.com/MiladRTX/Glint/blob/main/docs/CAPTURE-INTERNALS.md) document another relevant operation, `sceAvcap2EnableScanInEncode()`, before `sceAvcap2OpenVideo()`. A third **10.20-only, opt-in** test build now calls that AVCap2 export after the resource request and immediately before OpenVideo. It retains **resource 12** and the otherwise working request unchanged:
+
+- `PlayBridge-fw1020-scanin-source-probe.elf` — compiles with `--scanin-source-probe`.
+
+```powershell
+python tools/build_payload.py --scanin-source-probe --sdk C:\\SDK\\ps5-payload-sdk --llvm "C:\\Program Files\\LLVM\\bin" --output build\\PlayBridge-fw1020-scanin-source-probe.elf
+```
+
+**Hardware test:** Run a game with the regular PlayBridge Windows viewer, without a native broadcast. Check the `ScanIn source probe: EnableScanInEncode` return code, then trigger a PS5 notification and compare the TV with the stream. An absent export or non-zero return means the experiment may not have activated. If the console or capture behaves unexpectedly, stop the payload and return to the default ELF; a console restart may be necessary if a system-wide ScanIn state persists. This is **not** a verified game-only method. Never combine it with the separate GLS resource 200 probe.
+
 ## Expected limitations
 
 - A 10.20 console test confirmed video capture works with the revised request. AAC audio has not yet been verified on 10.20.
