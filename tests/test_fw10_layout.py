@@ -191,6 +191,36 @@ class Firmware10LayoutTests(unittest.TestCase):
                 if os.name == "nt":
                     ctypes.windll.kernel32.FreeLibrary(probe._handle)
 
+
+    def test_native_video_second_probe_uses_distinct_mode_4_union(self):
+        source = Path(self.temp.name) / "fw10-test.c"
+        out = Path(self.temp.name) / ("fw10-second.dll" if os.name == "nt" else "fw10-second.so")
+        if os.name == "nt":
+            flags = ["--target=x86_64-pc-windows-msvc", "-O1", "-fno-builtin",
+                     "-nostdlib", "-shared", "-fuse-ld=lld", "-Wl,/noentry"]
+        else:
+            flags = ["-std=c11", "-O1", "-fno-builtin", "-shared", "-fPIC"]
+        subprocess.run([compiler(), *flags, "-DPLAYBRIDGE_GLS_VIDEO_SECOND_PROBE=1",
+                        "-Wall", "-Wextra", "-Werror", "-I", str(ROOT / "payload"),
+                        str(source), "-o", str(out)],
+                       check=True, capture_output=True, text=True)
+        probe = ctypes.WinDLL(str(out)) if os.name == "nt" else ctypes.CDLL(str(out))
+        probe.pb_make.restype = ctypes.c_uint32
+        baseline, candidate = (ctypes.c_ubyte * 0x2e8)(), (ctypes.c_ubyte * 0x2e8)()
+        self.lib.pb_make(baseline, 60, 8000000, 0x138)
+        probe.pb_make(candidate, 60, 8000000, 0x138)
+        expected = bytearray(baseline)
+        struct.pack_into("<I", expected, 0x10, 2)
+        struct.pack_into("<I", expected, 0x14, 1)
+        struct.pack_into("<I", expected, 0x28, 200)
+        expected[0x1d0:0x2b8] = bytes(0x2b8 - 0x1d0)
+        struct.pack_into("<Q", expected, 0x1d0, 0x10)
+        struct.pack_into("<I", expected, 0x1d8, 0x138)
+        expected[0x1dc] = 1
+        self.assertEqual(bytes(candidate), bytes(expected))
+        if os.name == "nt":
+            ctypes.windll.kernel32.FreeLibrary(probe._handle)
+
     def test_1080p_bitrate_ceiling(self):
         p = (ctypes.c_ubyte * 0x2e8)()
         self.assertEqual(self.lib.pb_make(p, 60, 80000000, 0x138), 30000000)

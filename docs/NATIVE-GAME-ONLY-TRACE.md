@@ -83,3 +83,33 @@ data (other native initializer fields differ). All earlier ELF variants and the
 FW13.60 request remain unchanged. Both test builds record the first empty
 `sceAvcap2ReadVideo` status once, to distinguish an idle source from encoder
 errors. Notification-free capture must still be verified on actual hardware.
+
+## 10.20 hardware A/B: GLS role + resource
+
+Two isolated role probes were tested with a game running:
+
+- `request[0x14]=1`, type 0 (ScanIn), RA12: video+audio worked,
+  notifications still visible.
+- Same role/type with RA200: video+audio worked, notifications still visible.
+
+The first nonblocking ReadVideo returned `0x81950002` in both runs, then
+`Video meta` packets followed. This is a transient no-frame status, not a
+video-source failure. **Role 1 and RA200 alone do not filter overlays**.
+
+## Native GLS conditional VideoSecond mode
+
+The native GLS setup function at `NPXS40142` file offset `0x43410`
+selects type 2 (VideoSecond) when its internal mode variable equals 4.
+The branch calls type-selection helper at `0x47450`, which sets
+`request[0x10]=2`, `request[0x1d0]=0x10`,
+`request[0x1d8]=output_mode`, and `request[0x1dc]=1`.
+Unlike ScanIn's variant, this branch does not populate the extended
+`+0x1d0..+0x2b7` image/encoder options. AvCaptureManager's
+type-2 request validator is at `NPXS40100` file offset `0x1bac0`.
+
+The `--gls-video-second-probe` ELF models this conditional type-2
+section and also uses the directly observed native role 1 and RA200.
+The working default remains type 0 / role 2 / RA12. **This branch's
+purpose is not proven to be game-only streaming**, and it has not yet
+been tested on hardware. If OpenVideo/Start works but frames are zero,
+do not infer notification filtering; return to the baseline ELF.

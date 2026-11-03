@@ -83,3 +83,11 @@ jobs:
           name: PlayBridge-fw1020-gls-native-role-probe
           path: build/PlayBridge-fw1020-gls-native-role-probe.elf
           if-no-files-found: error
+      - name: Compile 10.20 native GLS VideoSecond mode-4 request probe
+        run: python tools/build_payload.py --gls-video-second-probe --output build/PlayBridge-fw1020-gls-video-second-probe.elf
+      - name: Upload native GLS VideoSecond request probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: PlayBridge-fw1020-gls-video-second-probe
+          path: build/PlayBridge-fw1020-gls-video-second-probe.elf
+          if-no-files-found: error
